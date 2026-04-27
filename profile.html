@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Мой профиль</title>
+    <style>
+        body { font-family: system-ui; background: #f0f2f5; padding: 20px; }
+        .container { max-width: 500px; margin: 0 auto; background: white; border-radius: 24px; padding: 30px; }
+        input, textarea { width: 100%; margin: 10px 0; padding: 12px; border-radius: 12px; border: 1px solid #ccc; }
+        button { padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 12px; cursor: pointer; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>👤 Профиль</h2>
+    <p><strong>UID:</strong> <span id="uid"></span></p>
+    <p><strong>Email (подтверждён):</strong> <span id="email"></span></p>
+    <input type="text" id="username" placeholder="Отображаемое имя">
+    <textarea id="bio" placeholder="О себе"></textarea>
+    <input type="text" id="avatar" placeholder="Ссылка на аватар (URL)">
+    <button id="saveBtn">Сохранить</button>
+    <button id="logoutBtn" style="background:#ef4444; margin-top: 20px;">Выйти</button>
+</div>
+<script type="module">
+    import { auth, db, ref, get, set, update, onValue } from './firebase-config.js';
+
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) {
+            window.location.href = 'index.html';
+            return;
+        }
+        if (!user.emailVerified) {
+            alert('Подтвердите email');
+            auth.signOut();
+            return;
+        }
+        document.getElementById('uid').innerText = user.uid;
+        document.getElementById('email').innerText = user.email;
+        const userRef = ref(db, `users/${user.uid}`);
+        const snapshot = await get(userRef);
+        const data = snapshot.val() || {};
+        document.getElementById('username').value = data.username || '';
+        document.getElementById('bio').value = data.bio || '';
+        document.getElementById('avatar').value = data.avatar || '';
+
+        document.getElementById('saveBtn').onclick = async () => {
+            await update(userRef, {
+                username: document.getElementById('username').value,
+                bio: document.getElementById('bio').value,
+                avatar: document.getElementById('avatar').value
+            });
+            alert('Сохранено');
+        };
+    });
+
+    document.getElementById('logoutBtn').onclick = () => {
+        auth.signOut().then(() => window.location.href = 'index.html');
+    };
+</script>
+</body>
+</html>
