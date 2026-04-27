@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Чат</title>
+    <style>
+        body { font-family: system-ui; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        .chat-header { background: #3b82f6; color: white; padding: 15px; display: flex; align-items: center; gap: 20px; }
+        .messages { flex: 1; overflow-y: auto; padding: 20px; background: #f0f2f5; }
+        .message { margin-bottom: 15px; display: flex; }
+        .message.own { justify-content: flex-end; }
+        .bubble { max-width: 70%; padding: 10px 15px; border-radius: 20px; background: white; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
+        .message.own .bubble { background: #3b82f6; color: white; }
+        .input-area { display: flex; padding: 15px; background: white; gap: 10px; }
+        .input-area input { flex: 1; padding: 12px; border-radius: 24px; border: 1px solid #ccc; }
+        .input-area button { padding: 12px 24px; background: #3b82f6; color: white; border: none; border-radius: 24px; cursor: pointer; }
+        .back-btn { background: none; border: none; color: white; font-size: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+<div class="chat-header">
+    <button class="back-btn" id="backBtn">←</button>
+    <span id="chatName">Загрузка...</span>
+    <span id="chatTypeBadge" style="font-size:12px; background:rgba(255,255,255,0.3); padding:4px 8px; border-radius:12px;"></span>
+</div>
+<div class="messages" id="messagesContainer"></div>
+<div class="input-area">
+    <input type="text" id="messageInput" placeholder="Сообщение...">
+    <button id="sendBtn">Отправить</button>
+</div>
+<script type="module">
+    import { auth, db, ref, onValue, push, set, get } from './firebase-config.js';
+
+    let currentUser = null;
+    let currentChatId = localStorage.getItem('currentChatId');
+    if (!currentChatId) window.location.href = 'chats.html';
+
+    auth.onAuthStateChanged(async (user) => {
+        if (!user || !user.emailVerified) {
+            window.location.href = 'index.html';
+            return;
+        }
+        currentUser = user;
+        loadChatInfo();
+        listenMessages();
+    });
+
+    async function loadChatInfo() {
+        const chatRef = ref(db, `chats/${currentChatId}`);
+        onValue(chatRef, (snap) => {
+            const chat = snap.val();
+            if (!chat) return;
+            document.getElementById('chatName').innerText = chat.name || (chat.type === 'private' ? 'Личный чат' : 'Диалог');
+            document.getElementById('chatTypeBadge').innerText = chat.type === 'group' ? 'Группа' : (chat.type === 'channel' ? 'Канал' : 'Личные');
+            // Если это канал, проверяем, может ли пользователь писать: только создатель или участник с правами (для простоты только создатель)
+            const canWrite = (chat.type === 'channel' && chat.createdBy === currentUser.uid) || chat.type !== 'channel';
+            document.getElementById('messageInput').disabled = !canWrite;
+            document.getElementById('sendBtn').disabled = !canWrite;
+            if (!canWrite) document.getElementById('messageInput').placeholder = 'Только чтение (канал)';
+        });
+    }
+
+    function listenMessages() {
+        const messagesRef = ref(db, `chats/${currentChatId}/messages`);
+        onValue(messagesRef, (snapshot) => {
+            const messages = snapshot.val() || {};
+            const messagesArray = Object.entries(messages).map(([id, msg]) => ({ id, ...msg }));
+            messagesArray.sort((a,b) => a.timestamp - b.timestamp);
+            renderMessages(messagesArray);
+        });
+    }
+
+    function renderMessages(messages) {
+        const container = document.getElementById('messagesContainer');
+        if (!messages.length) {
+            container.innerHTML = '<div style="text-align:center; color:gray;">Сообщений пока нет</div>';
+            return;
+        }
+        container.innerHTML = messages.map(msg => `
+            <div class="message ${msg.sender === currentUser.uid ? 'own' : ''}">
+                <div class="bubble">
+                    <div style="font-size:12px; font-weight:bold;">${msg.senderName || msg.sender}</div>
+                    <div>${escapeHtml(msg.text)}</div>
+                    <div style="font-size:10px; text-align:right;">${new Date(msg.timestamp).toLocaleTimeString()}</div>
+                </div>
+            </div>
+        `).join('');
+        container.scrollTop = container.scrollHeight;
+    }
+
+    window.sendMessage = async () => {
+        const input = document.getElementById('messageInput');
+        const text = input.value.trim();
+        if (!text) return;
+        // Получим имя отправителя
+        const userSnap = await get(ref(db, `users/${currentUser.uid}`));
+        const senderName = userSnap.val()?.username || currentUser.uid;
+        const newMsgRef = push(ref(db, `chats/${currentChatId}/messages`));
+        await set(newMsgRef, {
+            sender: currentUser.uid,
+            senderName: senderName,
+            text: text,
+            timestamp: Date.now()
+        });
+        input.value = '';
+    };
+
+    function escapeHtml(str) {
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    document.getElementById('sendBtn').onclick = sendMessage;
+    document.getElementById('messageInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+    document.getElementById('backBtn').onclick = () => window.location.href = 'chats.html';
+</script>
+</body>
+</html>
