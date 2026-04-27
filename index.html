@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Мессенджер — вход</title>
+    <style>
+        body { font-family: system-ui; background: #1e1e2f; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .card { background: white; padding: 30px; border-radius: 24px; width: 350px; text-align: center; }
+        input { width: 100%; margin: 10px 0; padding: 12px; border-radius: 12px; border: 1px solid #ccc; }
+        button { width: 100%; padding: 12px; background: #3b82f6; color: white; border: none; border-radius: 12px; cursor: pointer; }
+        .switch { margin-top: 15px; color: #3b82f6; cursor: pointer; }
+        .message { margin-top: 10px; font-size: 14px; color: red; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>💬 Мессенджер</h2>
+    <div id="modeLabel">Регистрация</div>
+    <input type="email" id="email" placeholder="Email" autocomplete="off">
+    <input type="text" id="username" placeholder="Имя пользователя (отображаемое)">
+    <input type="password" id="password" placeholder="Пароль">
+    <button id="submitBtn">Зарегистрироваться</button>
+    <div class="switch" id="switchBtn">Уже есть аккаунт? Войти</div>
+    <div id="info" class="message"></div>
+</div>
+<script type="module">
+    import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, db, ref, set } from './firebase-config.js';
+
+    let isLogin = false;
+    const emailInput = document.getElementById('email');
+    const usernameInput = document.getElementById('username');
+    const passInput = document.getElementById('password');
+    const submitBtn = document.getElementById('submitBtn');
+    const switchBtn = document.getElementById('switchBtn');
+    const modeLabel = document.getElementById('modeLabel');
+    const infoDiv = document.getElementById('info');
+
+    function showMessage(text, isError = true) {
+        infoDiv.style.color = isError ? 'red' : 'green';
+        infoDiv.innerText = text;
+        setTimeout(() => infoDiv.innerText = '', 4000);
+    }
+
+    async function register() {
+        const email = emailInput.value.trim();
+        const username = usernameInput.value.trim();
+        const password = passInput.value.trim();
+        if (!email || !username || !password) return showMessage('Заполните все поля');
+        try {
+            const userCred = await createUserWithEmailAndPassword(auth, email, password);
+            // Отправляем письмо с подтверждением
+            await sendEmailVerification(userCred.user);
+            // Сохраняем профиль в Realtime Database
+            await set(ref(db, `users/${userCred.user.uid}`), {
+                email: email,
+                username: username,
+                avatar: '',
+                bio: '',
+                contacts: {},
+                createdAt: Date.now()
+            });
+            showMessage('Письмо с подтверждением отправлено! Подтвердите email и войдите.', false);
+            // Автоматически разлогиниваем, чтобы подтвердил почту
+            await auth.signOut();
+            isLogin = false;
+            toggleMode();
+        } catch (err) {
+            showMessage(err.message);
+        }
+    }
+
+    async function login() {
+        const email = emailInput.value.trim();
+        const password = passInput.value.trim();
+        if (!email || !password) return showMessage('Введите email и пароль');
+        try {
+            const userCred = await signInWithEmailAndPassword(auth, email, password);
+            if (!userCred.user.emailVerified) {
+                await auth.signOut();
+                return showMessage('Подтвердите email (проверьте почту)');
+            }
+            // Обновим статус онлайн
+            await set(ref(db, `users/${userCred.user.uid}/online`), true);
+            window.location.href = 'chats.html';
+        } catch (err) {
+            showMessage(err.message);
+        }
+    }
+
+    function toggleMode() {
+        isLogin = !isLogin;
+        if (isLogin) {
+            modeLabel.innerText = 'Вход';
+            submitBtn.innerText = 'Войти';
+            switchBtn.innerText = 'Нет аккаунта? Зарегистрироваться';
+            usernameInput.style.display = 'none';
+        } else {
+            modeLabel.innerText = 'Регистрация';
+            submitBtn.innerText = 'Зарегистрироваться';
+            switchBtn.innerText = 'Уже есть аккаунт? Войти';
+            usernameInput.style.display = 'block';
+        }
+    }
+
+    submitBtn.onclick = () => isLogin ? login() : register();
+    switchBtn.onclick = toggleMode;
+    toggleMode(); // начальное состояние
+</script>
+</body>
+</html>
