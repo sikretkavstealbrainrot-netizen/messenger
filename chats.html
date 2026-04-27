@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Чаты</title>
+    <style>
+        body { font-family: system-ui; background: #f0f2f5; margin: 0; }
+        .sidebar { width: 350px; background: white; height: 100vh; padding: 20px; overflow-y: auto; }
+        .chat-item { padding: 15px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; justify-content: space-between; }
+        .chat-item:hover { background: #f9f9ff; }
+        .new-chat-btn { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 20px; margin-bottom: 20px; cursor: pointer; }
+        .profile-btn { position: fixed; bottom: 20px; left: 20px; background: #333; color: white; border: none; padding: 10px 15px; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+<div style="display: flex;">
+    <div class="sidebar">
+        <button class="new-chat-btn" id="newGroupBtn">➕ Создать группу</button>
+        <button class="new-chat-btn" id="newChannelBtn">📢 Создать канал</button>
+        <div id="chatsList">Загрузка...</div>
+        <button class="profile-btn" id="profileBtn">👤 Профиль</button>
+        <button class="profile-btn" id="contactsBtn" style="bottom: 80px;">📒 Контакты</button>
+    </div>
+    <div style="flex:1; display: flex; align-items: center; justify-content: center; color: gray;">
+        Выберите чат
+    </div>
+</div>
+<script type="module">
+    import { auth, db, ref, onValue, set, push, get, update } from './firebase-config.js';
+
+    let currentUser = null;
+    auth.onAuthStateChanged(async (user) => {
+        if (!user || !user.emailVerified) {
+            window.location.href = 'index.html';
+            return;
+        }
+        currentUser = user;
+        loadChats();
+    });
+
+    async function loadChats() {
+        // Загружаем чаты, где участником является currentUser.uid
+        const chatsRef = ref(db, 'chats');
+        onValue(chatsRef, (snapshot) => {
+            const allChats = snapshot.val() || {};
+            const myChats = [];
+            for (let chatId in allChats) {
+                const chat = allChats[chatId];
+                if (chat.members && chat.members[currentUser.uid]) {
+                    myChats.push({ id: chatId, ...chat });
+                }
+            }
+            renderChats(myChats);
+        });
+    }
+
+    function renderChats(chats) {
+        const container = document.getElementById('chatsList');
+        if (chats.length === 0) {
+            container.innerHTML = 'Нет чатов. Создайте группу или добавьте контакты.';
+            return;
+        }
+        container.innerHTML = chats.map(chat => `
+            <div class="chat-item" onclick="openChat('${chat.id}')">
+                <div><strong>${chat.name || (chat.type === 'private' ? 'Личный чат' : 'Без названия')}</strong><br>
+                <small>${chat.type === 'group' ? 'Группа' : chat.type === 'channel' ? 'Канал' : 'Личные'}</small></div>
+                <div>👉</div>
+            </div>
+        `).join('');
+    }
+
+    window.openChat = (chatId) => {
+        localStorage.setItem('currentChatId', chatId);
+        window.location.href = 'chat.html';
+    };
+
+    document.getElementById('newGroupBtn').onclick = async () => {
+        const groupName = prompt('Название группы');
+        if (!groupName) return;
+        // Простой диалог: добавить участников из контактов
+        const contactsSnap = await get(ref(db, `users/${currentUser.uid}/contacts`));
+        const contacts = contactsSnap.val() || {};
+        const contactUids = Object.keys(contacts);
+        if (contactUids.length === 0) {
+            alert('Нет контактов для добавления в группу');
+            return;
+        }
+        const members = { [currentUser.uid]: true };
+        for (let uid of contactUids) {
+            if (confirm(`Добавить ${uid} в группу?`)) members[uid] = true;
+        }
+        const newChatRef = push(ref(db, 'chats'));
+        await set(newChatRef, {
+            type: 'group',
+            name: groupName,
+            createdBy: currentUser.uid,
+            members: members,
+            messages: {}
+        });
+        alert('Группа создана');
+    };
+
+    document.getElementById('newChannelBtn').onclick = async () => {
+        const channelName = prompt('Название канала');
+        if (!channelName) return;
+        const newChatRef = push(ref(db, 'chats'));
+        await set(newChatRef, {
+            type: 'channel',
+            name: channelName,
+            createdBy: currentUser.uid,
+            members: { [currentUser.uid]: true }, // только создатель, другие будут подписываться
+            messages: {}
+        });
+        alert('Канал создан. Другие пользователи смогут подписаться через поиск.');
+    };
+
+    document.getElementById('profileBtn').onclick = () => window.location.href = 'profile.html';
+    document.getElementById('contactsBtn').onclick = () => window.location.href = 'contacts.html';
+</script>
+</body>
+</html>
