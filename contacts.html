@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Контакты</title>
+    <style>
+        body { font-family: system-ui; background: #f0f2f5; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .card { background: white; border-radius: 24px; padding: 20px; margin-bottom: 20px; }
+        input, button { padding: 10px; margin: 5px; border-radius: 12px; }
+        .contact-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <h3>➕ Добавить контакт</h3>
+        <input type="text" id="searchEmail" placeholder="Email пользователя">
+        <button id="searchBtn">Найти</button>
+        <div id="searchResult"></div>
+    </div>
+    <div class="card">
+        <h3>📒 Мои контакты</h3>
+        <div id="contactsList">Загрузка...</div>
+    </div>
+    <button id="backBtn" style="margin-top: 20px;">← Назад в чаты</button>
+</div>
+<script type="module">
+    import { auth, db, ref, get, set, onValue, update } from './firebase-config.js';
+
+    let currentUser = null;
+    auth.onAuthStateChanged(async (user) => {
+        if (!user || !user.emailVerified) {
+            window.location.href = 'index.html';
+            return;
+        }
+        currentUser = user;
+        loadContacts();
+    });
+
+    async function loadContacts() {
+        const userRef = ref(db, `users/${currentUser.uid}/contacts`);
+        onValue(userRef, async (snapshot) => {
+            const contacts = snapshot.val() || {};
+            const contactIds = Object.keys(contacts);
+            const container = document.getElementById('contactsList');
+            if (contactIds.length === 0) {
+                container.innerHTML = 'Нет контактов';
+                return;
+            }
+            let html = '';
+            for (let uid of contactIds) {
+                const contactSnap = await get(ref(db, `users/${uid}`));
+                const contactData = contactSnap.val();
+                if (contactData) {
+                    html += `<div class="contact-item">
+                        <div><strong>${contactData.username}</strong><br>${contactData.email}</div>
+                        <button onclick="removeContact('${uid}')">Удалить</button>
+                    </div>`;
+                }
+            }
+            container.innerHTML = html;
+        });
+    }
+
+    window.removeContact = async (contactUid) => {
+        await update(ref(db, `users/${currentUser.uid}/contacts`), { [contactUid]: null });
+    };
+
+    document.getElementById('searchBtn').onclick = async () => {
+        const email = document.getElementById('searchEmail').value.trim();
+        if (!email) return;
+        // Поиск по email (лучше через users с индексом, но для простоты пройдёмся)
+        const usersRef = ref(db, 'users');
+        const snapshot = await get(usersRef);
+        let foundUser = null;
+        snapshot.forEach(child => {
+            if (child.val().email === email) foundUser = { uid: child.key, ...child.val() };
+        });
+        const resultDiv = document.getElementById('searchResult');
+        if (!foundUser) {
+            resultDiv.innerHTML = 'Пользователь не найден';
+            return;
+        }
+        if (foundUser.uid === currentUser.uid) {
+            resultDiv.innerHTML = 'Это вы';
+            return;
+        }
+        // Проверим, уже в контактах
+        const contactSnap = await get(ref(db, `users/${currentUser.uid}/contacts/${foundUser.uid}`));
+        if (contactSnap.exists()) {
+            resultDiv.innerHTML = 'Уже в контактах';
+            return;
+        }
+        resultDiv.innerHTML = `
+            <div>
+                <strong>${foundUser.username}</strong> (${foundUser.email})<br>
+                <button onclick="addContact('${foundUser.uid}')">Добавить в контакты</button>
+            </div>
+        `;
+    };
+
+    window.addContact = async (uid) => {
+        await set(ref(db, `users/${currentUser.uid}/contacts/${uid}`), true);
+        document.getElementById('searchResult').innerHTML = 'Добавлено!';
+    };
+
+    document.getElementById('backBtn').onclick = () => window.location.href = 'chats.html';
+</script>
+</body>
+</html>
