@@ -199,12 +199,6 @@
             background: #fde8e8;
             color: #c0392b;
         }
-        .flex-row {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
     </style>
 </head>
 <body>
@@ -242,7 +236,6 @@
         let currentUser = null;
         let userDocRef = null;
 
-        // Загрузка данных пользователя
         firebase.auth().onAuthStateChanged((user) => {
             if (user) {
                 currentUser = user;
@@ -271,7 +264,6 @@
                             statusBadge.style.background = '#fde8e8';
                             statusBadge.style.color = '#c0392b';
                         }
-                        // Показываем текущий код в поле (для удобства, скрыто)
                         document.getElementById('securityCode').value = code;
                     }
                 })
@@ -292,9 +284,6 @@
                 return;
             }
             
-            // Проверяем, что код не слишком простой (опционально)
-            // Можно добавить проверку на повторяющиеся символы, но оставим свободу
-            
             if (!userDocRef) {
                 showMessage('❌ Ошибка: пользователь не загружен', 'error');
                 return;
@@ -305,7 +294,7 @@
             })
             .then(() => {
                 showMessage('✅ Код успешно сохранён!', 'success');
-                loadUserData(); // обновляем статус
+                loadUserData();
             })
             .catch((error) => {
                 showMessage('❌ Ошибка сохранения: ' + error.message, 'error');
