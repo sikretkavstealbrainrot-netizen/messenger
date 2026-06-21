@@ -3,20 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Мессенджер</title>
+    <title>Профиль</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
@@ -24,314 +18,99 @@
             align-items: center;
             padding: 20px;
         }
-        
         .container {
             background: white;
-            padding: 50px 40px 40px;
+            padding: 40px;
             border-radius: 24px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
             width: 100%;
-            max-width: 420px;
-        }
-        
-        .container h1 {
+            max-width: 400px;
             text-align: center;
-            font-size: 28px;
-            font-weight: 700;
-            color: #1a1a2e;
-            margin-bottom: 8px;
         }
-        
-        .container h2 {
-            text-align: center;
+        h2 { color: #1a1a2e; margin-bottom: 8px; }
+        .subtitle { color: #888; font-size: 14px; margin-bottom: 30px; }
+        .email-box {
+            background: #f0f2ff;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            color: #333;
             font-size: 18px;
             font-weight: 500;
-            color: #666;
-            margin-bottom: 30px;
         }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        .form-group label {
-            display: block;
-            font-size: 13px;
-            font-weight: 600;
-            color: #555;
-            margin-bottom: 6px;
-            letter-spacing: 0.3px;
-        }
-        
-        .form-group input {
+        .email-box span { color: #667eea; }
+        .btn {
             width: 100%;
-            padding: 14px 16px;
-            border: 2px solid #e8ecf1;
-            border-radius: 12px;
-            font-size: 15px;
-            color: #333;
-            background: #fafbfc;
-            transition: all 0.3s ease;
-        }
-        
-        .form-group input:focus {
-            outline: none;
-            border-color: #667eea;
-            background: white;
-            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
-        }
-        
-        .form-group input::placeholder {
-            color: #aaa;
-        }
-        
-        .btn-primary {
-            width: 100%;
-            padding: 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            padding: 14px;
             border: none;
             border-radius: 12px;
             font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 28px rgba(102, 126, 234, 0.4);
-        }
-        
-        .btn-primary:active {
-            transform: translateY(0);
-        }
-        
-        .link-row {
-            text-align: center;
-            margin-top: 20px;
-            color: #888;
-            font-size: 14px;
-        }
-        
-        .link-row a {
-            color: #667eea;
-            text-decoration: none;
             font-weight: 600;
             cursor: pointer;
-            transition: color 0.3s;
+            transition: all 0.3s ease;
+            margin-bottom: 12px;
         }
-        
-        .link-row a:hover {
-            color: #764ba2;
-            text-decoration: underline;
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
         }
-        
-        .error-message {
-            background: #fde8e8;
-            color: #c0392b;
-            padding: 12px 16px;
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102,126,234,0.4); }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-secondary { background: #e8ecf1; color: #333; }
+        .btn-secondary:hover { background: #d5d9e0; }
+        .status {
+            padding: 12px;
             border-radius: 10px;
             font-size: 14px;
-            margin-top: 16px;
-            text-align: center;
+            margin-top: 12px;
             display: none;
-            border-left: 4px solid #c0392b;
         }
-        
-        .error-message.show {
-            display: block;
-        }
-        
-        .success-message {
-            background: #d4edda;
-            color: #155724;
-            padding: 12px 16px;
-            border-radius: 10px;
-            font-size: 14px;
-            margin-top: 16px;
-            text-align: center;
-            display: none;
-            border-left: 4px solid #155724;
-        }
-        
-        .success-message.show {
-            display: block;
-        }
-        
-        .hidden {
-            display: none !important;
-        }
+        .status.success { display: block; background: #d4edda; color: #155724; }
+        .status.error { display: block; background: #fde8e8; color: #c0392b; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>💬 Мессенджер</h1>
+        <h2>👤 Профиль</h2>
+        <p class="subtitle">Ваши данные</p>
         
-        <!-- ====== ФОРМА РЕГИСТРАЦИИ ====== -->
-        <div id="registerForm">
-            <h2>Регистрация</h2>
-            
-            <div class="form-group">
-                <label>Email</label>
-                <input type="email" id="regEmail" placeholder="sikretkavstealbrainrot@gmail.com">
-            </div>
-            
-            <div class="form-group">
-                <label>Пароль</label>
-                <input type="password" id="regPassword" placeholder="Введите пароль">
-            </div>
-            
-            <button class="btn-primary" onclick="register()">ЗАРЕГИСТРИРОВАТЬСЯ</button>
-            
-            <div class="error-message" id="registerError"></div>
-            <div class="success-message" id="registerSuccess"></div>
-            
-            <div class="link-row">
-                Уже есть аккаунт? <a onclick="showLogin()">Войти</a>
-            </div>
+        <div class="email-box">
+            📧 <span id="userEmail">Загрузка...</span>
         </div>
         
-        <!-- ====== ФОРМА ВХОДА ====== -->
-        <div id="loginForm" class="hidden">
-            <h2>Вход</h2>
-            
-            <div class="form-group">
-                <label>Email</label>
-                <input type="email" id="loginEmail" placeholder="sikretkavstealbrainrot@gmail.com">
-            </div>
-            
-            <div class="form-group">
-                <label>Пароль</label>
-                <input type="password" id="loginPassword" placeholder="Введите пароль">
-            </div>
-            
-            <button class="btn-primary" onclick="login()">ВОЙТИ</button>
-            
-            <div class="error-message" id="loginError"></div>
-            
-            <div class="link-row">
-                Нет аккаунта? <a onclick="showRegister()">Зарегистрироваться</a>
-            </div>
-            
-            <!-- ❌ ССЫЛКА "ЗАБЫЛИ ПАРОЛЬ?" УДАЛЕНА -->
-        </div>
+        <!-- ❌ УДАЛЕНА ФОРМА СМЕНЫ EMAIL -->
+        <!-- ❌ УДАЛЕНА КНОПКА ПОДТВЕРЖДЕНИЯ EMAIL -->
+        
+        <button class="btn btn-primary" onclick="location.href='chats.html'">💬 Перейти в чаты</button>
+        <button class="btn btn-danger" onclick="logout()">🚪 Выйти</button>
+        
+        <div class="status" id="statusMessage"></div>
     </div>
 
     <script>
-        // ========== ПЕРЕКЛЮЧЕНИЕ ФОРМ ==========
-        function showRegister() {
-            document.getElementById('loginForm').classList.add('hidden');
-            document.getElementById('registerForm').classList.remove('hidden');
-            document.getElementById('registerError').classList.remove('show');
-            document.getElementById('registerSuccess').classList.remove('show');
-        }
-        
-        function showLogin() {
-            document.getElementById('registerForm').classList.add('hidden');
-            document.getElementById('loginForm').classList.remove('hidden');
-            document.getElementById('loginError').classList.remove('show');
-        }
-
-        // ========== РЕГИСТРАЦИЯ (БЕЗ ОТПРАВКИ ПИСЬМА) ==========
-        function register() {
-            const email = document.getElementById('regEmail').value.trim();
-            const password = document.getElementById('regPassword').value;
-            const errorEl = document.getElementById('registerError');
-            const successEl = document.getElementById('registerSuccess');
-            
-            // Скрываем старые сообщения
-            errorEl.classList.remove('show');
-            successEl.classList.remove('show');
-            
-            // Валидация
-            if (!email || !password) {
-                errorEl.textContent = '⚠️ Заполните все поля';
-                errorEl.classList.add('show');
-                return;
-            }
-            
-            if (password.length < 6) {
-                errorEl.textContent = '⚠️ Пароль должен быть не менее 6 символов';
-                errorEl.classList.add('show');
-                return;
-            }
-            
-            // 🔥 РЕГИСТРАЦИЯ БЕЗ ПОДТВЕРЖДЕНИЯ EMAIL
-            firebase.auth().createUserWithEmailAndPassword(email, password)
-                .then((userCredential) => {
-                    // ✅ Пользователь создан
-                    // ❌ НЕ вызывается sendEmailVerification()
-                    
-                    successEl.textContent = '✅ Регистрация успешна! Перенаправление...';
-                    successEl.classList.add('show');
-                    
-                    setTimeout(() => {
-                        window.location.href = 'chats.html';
-                    }, 1500);
-                })
-                .catch((error) => {
-                    let message = error.message;
-                    // Делаем сообщение понятнее
-                    if (error.code === 'auth/email-already-in-use') {
-                        message = '❌ Этот email уже используется. Войдите или используйте другой email.';
-                    } else if (error.code === 'auth/invalid-email') {
-                        message = '❌ Неверный формат email.';
-                    } else if (error.code === 'auth/weak-password') {
-                        message = '❌ Пароль слишком слабый. Минимум 6 символов.';
-                    }
-                    errorEl.textContent = message;
-                    errorEl.classList.add('show');
-                });
-        }
-
-        // ========== ВХОД ==========
-        function login() {
-            const email = document.getElementById('loginEmail').value.trim();
-            const password = document.getElementById('loginPassword').value;
-            const errorEl = document.getElementById('loginError');
-            
-            errorEl.classList.remove('show');
-            
-            if (!email || !password) {
-                errorEl.textContent = '⚠️ Заполните все поля';
-                errorEl.classList.add('show');
-                return;
-            }
-            
-            firebase.auth().signInWithEmailAndPassword(email, password)
-                .then(() => {
-                    window.location.href = 'chats.html';
-                })
-                .catch((error) => {
-                    let message = error.message;
-                    if (error.code === 'auth/user-not-found') {
-                        message = '❌ Пользователь не найден. Зарегистрируйтесь.';
-                    } else if (error.code === 'auth/wrong-password') {
-                        message = '❌ Неверный пароль. Попробуйте снова.';
-                    } else if (error.code === 'auth/invalid-email') {
-                        message = '❌ Неверный формат email.';
-                    }
-                    errorEl.textContent = message;
-                    errorEl.classList.add('show');
-                });
-        }
-
-        // ========== АВТО-ВХОД ==========
         firebase.auth().onAuthStateChanged((user) => {
-            if (user && window.location.pathname.includes('index.html')) {
-                window.location.href = 'chats.html';
+            if (user) {
+                document.getElementById('userEmail').textContent = user.email || 'Email не указан';
+            } else {
+                window.location.href = 'index.html';
             }
         });
 
-        // ❌ ========== ВСЕ ФУНКЦИИ ОТПРАВКИ ПИСЕМ УДАЛЕНЫ ==========
-        // ❌ нет sendEmailVerification()
-        // ❌ нет sendPasswordResetEmail()
-        // ❌ нет кнопки "Забыли пароль?"
-        // ❌ нет смены email в профиле
-        // ❌ нет подтверждения email
+        function logout() {
+            firebase.auth().signOut()
+                .then(() => { window.location.href = 'index.html'; })
+                .catch((error) => {
+                    const el = document.getElementById('statusMessage');
+                    el.textContent = '❌ ' + error.message;
+                    el.className = 'status error';
+                });
+        }
+
+        // ❌ УДАЛЕНЫ ВСЕ ФУНКЦИИ СВЯЗАННЫЕ С EMAIL:
+        // - sendEmailVerification()
+        // - updateEmail()
+        // - changeEmail()
     </script>
 </body>
-</html
+</html>
