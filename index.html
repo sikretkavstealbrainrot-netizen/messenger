@@ -2,109 +2,75 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Мессенджер — вход</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мессенджер - Вход</title>
+    <!-- Подключение Firebase (если используется) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="firebase-config.js"></script>
     <style>
-        body { font-family: system-ui; background: #1e1e2f; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        .card { background: white; padding: 30px; border-radius: 24px; width: 350px; text-align: center; }
-        input { width: 100%; margin: 10px 0; padding: 12px; border-radius: 12px; border: 1px solid #ccc; }
-        button { width: 100%; padding: 12px; background: #3b82f6; color: white; border: none; border-radius: 12px; cursor: pointer; }
-        .switch { margin-top: 15px; color: #3b82f6; cursor: pointer; }
-        .message { margin-top: 10px; font-size: 14px; color: red; }
+        body { font-family: Arial; max-width: 400px; margin: 50px auto; padding: 20px; }
+        input, button { display: block; width: 100%; padding: 10px; margin: 10px 0; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
-<div class="card">
-    <h2>💬 Мессенджер</h2>
-    <div id="modeLabel">Регистрация</div>
-    <input type="email" id="email" placeholder="Email" autocomplete="off">
-    <input type="text" id="username" placeholder="Имя пользователя (отображаемое)">
-    <input type="password" id="password" placeholder="Пароль">
-    <button id="submitBtn">Зарегистрироваться</button>
-    <div class="switch" id="switchBtn">Уже есть аккаунт? Войти</div>
-    <div id="info" class="message"></div>
-</div>
-<script type="module">
-    import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, db, ref, set } from './firebase-config.js';
+    <h2>Вход в мессенджер</h2>
+    
+    <!-- Форма входа -->
+    <div id="loginForm">
+        <input type="email" id="loginEmail" placeholder="Email">
+        <input type="password" id="loginPassword" placeholder="Пароль">
+        <button onclick="login()">Войти</button>
+        <button onclick="showRegister()">Зарегистрироваться</button>
+        <!-- УДАЛЕНА КНОПКА ВОССТАНОВЛЕНИЯ ПАРОЛЯ -->
+    </div>
 
-    let isLogin = false;
-    const emailInput = document.getElementById('email');
-    const usernameInput = document.getElementById('username');
-    const passInput = document.getElementById('password');
-    const submitBtn = document.getElementById('submitBtn');
-    const switchBtn = document.getElementById('switchBtn');
-    const modeLabel = document.getElementById('modeLabel');
-    const infoDiv = document.getElementById('info');
+    <!-- Форма регистрации -->
+    <div id="registerForm" class="hidden">
+        <input type="email" id="regEmail" placeholder="Email">
+        <input type="password" id="regPassword" placeholder="Пароль">
+        <button onclick="register()">Зарегистрироваться</button>
+        <button onclick="showLogin()">Назад</button>
+    </div>
 
-    function showMessage(text, isError = true) {
-        infoDiv.style.color = isError ? 'red' : 'green';
-        infoDiv.innerText = text;
-        setTimeout(() => infoDiv.innerText = '', 4000);
-    }
-
-    async function register() {
-        const email = emailInput.value.trim();
-        const username = usernameInput.value.trim();
-        const password = passInput.value.trim();
-        if (!email || !username || !password) return showMessage('Заполните все поля');
-        try {
-            const userCred = await createUserWithEmailAndPassword(auth, email, password);
-            // Отправляем письмо с подтверждением
-            await sendEmailVerification(userCred.user);
-            // Сохраняем профиль в Realtime Database
-            await set(ref(db, `users/${userCred.user.uid}`), {
-                email: email,
-                username: username,
-                avatar: '',
-                bio: '',
-                contacts: {},
-                createdAt: Date.now()
-            });
-            showMessage('Письмо с подтверждением отправлено! Подтвердите email и войдите.', false);
-            // Автоматически разлогиниваем, чтобы подтвердил почту
-            await auth.signOut();
-            isLogin = false;
-            toggleMode();
-        } catch (err) {
-            showMessage(err.message);
+    <script>
+        // Функция входа
+        function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            firebase.auth().signInWithEmailAndPassword(email, password)
+                .then(() => { window.location.href = 'chats.html'; })
+                .catch(error => alert(error.message));
         }
-    }
 
-    async function login() {
-        const email = emailInput.value.trim();
-        const password = passInput.value.trim();
-        if (!email || !password) return showMessage('Введите email и пароль');
-        try {
-            const userCred = await signInWithEmailAndPassword(auth, email, password);
-            if (!userCred.user.emailVerified) {
-                await auth.signOut();
-                return showMessage('Подтвердите email (проверьте почту)');
-            }
-            // Обновим статус онлайн
-            await set(ref(db, `users/${userCred.user.uid}/online`), true);
-            window.location.href = 'chats.html';
-        } catch (err) {
-            showMessage(err.message);
+        // Функция регистрации
+        function register() {
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            firebase.auth().createUserWithEmailAndPassword(email, password)
+                .then(() => { 
+                    alert('Регистрация успешна!');
+                    window.location.href = 'chats.html';
+                })
+                .catch(error => alert(error.message));
         }
-    }
 
-    function toggleMode() {
-        isLogin = !isLogin;
-        if (isLogin) {
-            modeLabel.innerText = 'Вход';
-            submitBtn.innerText = 'Войти';
-            switchBtn.innerText = 'Нет аккаунта? Зарегистрироваться';
-            usernameInput.style.display = 'none';
-        } else {
-            modeLabel.innerText = 'Регистрация';
-            submitBtn.innerText = 'Зарегистрироваться';
-            switchBtn.innerText = 'Уже есть аккаунт? Войти';
-            usernameInput.style.display = 'block';
+        // Переключение форм
+        function showRegister() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.remove('hidden');
         }
-    }
+        function showLogin() {
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('loginForm').classList.remove('hidden');
+        }
 
-    submitBtn.onclick = () => isLogin ? login() : register();
-    switchBtn.onclick = toggleMode;
-    toggleMode(); // начальное состояние
-</script>
+        // ❌ УДАЛЕНА ВСЯ ФУНКЦИЯ ВОССТАНОВЛЕНИЯ ПАРОЛЯ
+        // Больше нет:
+        // - sendPasswordResetEmail()
+        // - кнопки "Забыли пароль?"
+        // - поля для ввода email для восстановления
+    </script>
 </body>
 </html>
