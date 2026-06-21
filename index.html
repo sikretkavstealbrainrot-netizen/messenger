@@ -156,23 +156,6 @@
         .hidden {
             display: none !important;
         }
-        .code-warning {
-            background: #fff3cd;
-            color: #856404;
-            padding: 12px 16px;
-            border-radius: 10px;
-            font-size: 13px;
-            margin-top: 16px;
-            text-align: center;
-            border-left: 4px solid #ffc107;
-            display: none;
-        }
-        .code-warning.show {
-            display: block;
-        }
-        .code-warning strong {
-            color: #d39e00;
-        }
         .code-input {
             letter-spacing: 2px;
             font-size: 18px !important;
@@ -260,6 +243,9 @@
     </div>
 
     <script>
+        const db = firebase.firestore();
+        let loginUserData = null; // временное хранение данных пользователя при входе
+
         // ========== ПЕРЕКЛЮЧЕНИЕ ФОРМ ==========
         function showRegister() {
             document.getElementById('loginForm').classList.add('hidden');
@@ -304,16 +290,28 @@
                 return;
             }
             
-            // Создаем временный email (ник + случайное число)
-            const tempEmail = username.toLowerCase().replace(/[^a-z0-9]/g, '') + Math.floor(Math.random()*10000) + '@temp.com';
+            // Генерируем уникальный и ВСЕГДА ВАЛИДНЫЙ email
+            const uniqueId = Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+            const email = 'user_' + uniqueId + '@temp.com';
             
-            firebase.auth().createUserWithEmailAndPassword(tempEmail, password)
+            // Сначала проверяем, занят ли ник
+            db.collection('users').where('username', '==', username).get()
+                .then((querySnapshot) => {
+                    if (!querySnapshot.empty) {
+                        errorEl.textContent = '❌ Этот ник уже занят. Придумайте другой.';
+                        errorEl.classList.add('show');
+                        return Promise.reject('nickname_taken');
+                    }
+                    // Ник свободен — создаём пользователя
+                    return firebase.auth().createUserWithEmailAndPassword(email, password);
+                })
                 .then((userCredential) => {
                     const user = userCredential.user;
-                    // Сохраняем ник и пустой код в Firestore
+                    // Сохраняем данные пользователя в Firestore
                     return db.collection('users').doc(user.uid).set({
                         username: username,
-                        securityCode: '', // пусто = нет кода
+                        email: email,          // сохраняем email, чтобы потом использовать для входа
+                        securityCode: '',      // пустой код по умолчанию
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 })
@@ -325,9 +323,15 @@
                     }, 1500);
                 })
                 .catch((error) => {
+                    if (error === 'nickname_taken') return; // уже показали ошибку
+                    
                     let msg = error.message;
                     if (error.code === 'auth/email-already-in-use') {
-                        msg = '❌ Этот ник уже занят. Попробуйте другой.';
+                        msg = '❌ Ошибка: этот email уже используется. Попробуйте снова.';
+                    } else if (error.code === 'auth/invalid-email') {
+                        msg = '❌ Неверный email. Попробуйте другой ник.';
+                    } else if (error.code === 'auth/weak-password') {
+                        msg = '❌ Пароль слишком слабый. Используйте минимум 6 символов.';
                     }
                     errorEl.textContent = msg;
                     errorEl.classList.add('show');
@@ -335,8 +339,6 @@
         }
 
         // ========== ВХОД (первый этап) ==========
-        let loginUserData = null; // временно храним данные пользователя
-
         function login() {
             const username = document.getElementById('loginUsername').value.trim();
             const password = document.getElementById('loginPassword').value;
@@ -354,7 +356,7 @@
             db.collection('users').where('username', '==', username).get()
                 .then((querySnapshot) => {
                     if (querySnapshot.empty) {
-                        errorEl.textContent = '❌ Пользователь не найден';
+                        errorEl.textContent = '❌ Пользователь с таким ником не найден';
                         errorEl.classList.add('show');
                         return;
                     }
@@ -363,28 +365,13 @@
                     const userData = doc.data();
                     const uid = doc.id;
                     
-                    // Пытаемся войти с временным email (восстанавливаем email из ника)
-                    // Мы не храним email, поэтому используем поиск по uid
-                    // Для входа нам нужен email, но мы его не знаем. Решение: хранить email в Firestore или использовать другой метод.
-                    // Проще: при регистрации сохраняем email в поле, но мы его не сохранили.
-                    // Переделаем: будем использовать email = ник + '@temp.com' при регистрации, но это может конфликтовать.
-                    // Лучше: при входе сначала проверить наличие пользователя с таким ником, затем попытаться войти через email, но мы не знаем email.
-                    // Альтернатива: использовать Firebase Authentication с кастомными токенами, но это сложно.
-                    // Самое простое: при регистрации сохранять email в Firestore, а при входе использовать его.
-                    // Я изменю регистрацию: буду сохранять email в поле.
-                    // Но пока проще: при входе будем использовать временный email, сгенерированный из ника.
-                    // Однако проблема: если два пользователя с одинаковым ником? Ник уникален, мы проверяем.
-                    // Восстановим email из ника: 
-                    const email = username.toLowerCase().replace(/[^a-z0-9]/g, '') + '@temp.com';
-                    
-                    // Вход
-                    firebase.auth().signInWithEmailAndPassword(email, password)
+                    // Входим с сохранённым email и введённым паролем
+                    return firebase.auth().signInWithEmailAndPassword(userData.email, password)
                         .then((userCredential) => {
-                            // Проверяем, совпадает ли uid с найденным
+                            // Проверяем, что uid совпадает
                             if (userCredential.user.uid !== uid) {
-                                // Если не совпадает, выходим и показываем ошибку
                                 firebase.auth().signOut();
-                                errorEl.textContent = '❌ Неверные данные';
+                                errorEl.textContent = '❌ Ошибка входа. Попробуйте снова.';
                                 errorEl.classList.add('show');
                                 return;
                             }
@@ -405,14 +392,16 @@
                                 // Нет кода — сразу переходим
                                 window.location.href = 'chats.html';
                             }
-                        })
-                        .catch((error) => {
-                            errorEl.textContent = '❌ Неверный пароль или пользователь не найден';
-                            errorEl.classList.add('show');
                         });
                 })
                 .catch((error) => {
-                    errorEl.textContent = '❌ Ошибка: ' + error.message;
+                    if (error.code === 'auth/wrong-password') {
+                        errorEl.textContent = '❌ Неверный пароль';
+                    } else if (error.code === 'auth/user-not-found') {
+                        errorEl.textContent = '❌ Пользователь не найден';
+                    } else {
+                        errorEl.textContent = '❌ Ошибка: ' + error.message;
+                    }
                     errorEl.classList.add('show');
                 });
         }
@@ -442,9 +431,7 @@
                 return;
             }
             
-            // Проверяем код
             if (code === loginUserData.securityCode) {
-                // Код верный — вход
                 window.location.href = 'chats.html';
             } else {
                 errorEl.textContent = '❌ Неверный безопасный код';
@@ -458,23 +445,23 @@
             document.getElementById('codeField').classList.add('hidden');
             document.getElementById('loginError').className = 'error-message';
             document.getElementById('loginError').textContent = '';
+            document.getElementById('loginError').style.background = '';
+            document.getElementById('loginError').style.color = '';
+            document.getElementById('loginError').style.borderLeftColor = '';
             document.getElementById('loginCode').value = '';
             loginUserData = null;
-            // Выходим из аккаунта, если зашли
             firebase.auth().signOut();
         }
 
-        // ========== АВТО-ВХОД ==========
+        // ========== АВТО-ВХОД (если уже авторизован) ==========
         firebase.auth().onAuthStateChanged((user) => {
             if (user && window.location.pathname.includes('index.html')) {
-                // Проверяем, есть ли код
                 db.collection('users').doc(user.uid).get()
                     .then((doc) => {
                         if (doc.exists) {
                             const data = doc.data();
                             if (data.securityCode && data.securityCode.length > 0) {
-                                // Есть код — показываем поле для кода
-                                // Но мы уже на странице входа, можно показать
+                                // Есть код — показываем поле
                                 document.getElementById('codeField').classList.remove('hidden');
                                 document.getElementById('loginError').textContent = '🔑 Введите безопасный код для входа';
                                 document.getElementById('loginError').className = 'error-message show';
@@ -485,13 +472,16 @@
                             } else {
                                 window.location.href = 'chats.html';
                             }
+                        } else {
+                            // Если нет документа, возможно, старый пользователь — выходим
+                            firebase.auth().signOut();
                         }
+                    })
+                    .catch(() => {
+                        firebase.auth().signOut();
                     });
             }
         });
-
-        // Инициализация Firestore
-        const db = firebase.firestore();
     </script>
 </body>
 </html>
