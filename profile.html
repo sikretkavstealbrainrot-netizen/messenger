@@ -8,28 +8,104 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="firebase-config.js"></script>
     <style>
-        body { font-family: Arial; max-width: 400px; margin: 50px auto; padding: 20px; }
-        button { display: block; width: 100%; padding: 10px; margin: 10px 0; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .email {
+            color: #667eea;
+            font-size: 18px;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f0f2ff;
+            border-radius: 10px;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+        .status {
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
     </style>
 </head>
 <body>
-    <h2>Профиль</h2>
-    <p id="userEmail">Email: </p>
-    <button onclick="logout()">Выйти</button>
-    <button onclick="location.href='chats.html'">Назад к чатам</button>
-    
-    <!-- ❌ УДАЛЕНЫ ВСЕ ФУНКЦИИ СМЕНЫ EMAIL -->
-    <!-- Больше нет:
-         - формы для смены email
-         - отправки подтверждения на почту
-         - кнопки "Подтвердить email"
-    -->
+    <div class="container">
+        <h2>👤 Профиль</h2>
+        <div class="email" id="userEmail">Загрузка...</div>
+        
+        <!-- ❌ УДАЛЕНА ФОРМА СМЕНЫ EMAIL -->
+        <!-- ❌ УДАЛЕНА КНОПКА "ПОДТВЕРДИТЬ EMAIL" -->
+        
+        <button class="btn-primary" onclick="location.href='chats.html'">💬 Чаты</button>
+        <button class="btn-danger" onclick="logout()">🚪 Выйти</button>
+        
+        <div id="statusMessage"></div>
+    </div>
 
     <script>
-        // Отображение текущего пользователя
-        firebase.auth().onAuthStateChanged(user => {
+        // Проверка авторизации
+        firebase.auth().onAuthStateChanged((user) => {
             if (user) {
-                document.getElementById('userEmail').textContent = 'Email: ' + user.email;
+                document.getElementById('userEmail').textContent = user.email || 'Email не указан';
             } else {
                 window.location.href = 'index.html';
             }
@@ -38,15 +114,26 @@
         // Выход
         function logout() {
             firebase.auth().signOut()
-                .then(() => { window.location.href = 'index.html'; })
-                .catch(error => alert(error.message));
+                .then(() => {
+                    window.location.href = 'index.html';
+                })
+                .catch((error) => {
+                    showStatus('Ошибка: ' + error.message, 'error');
+                });
         }
 
-        // ❌ УДАЛЕНА ФУНКЦИЯ СМЕНЫ EMAIL
-        // Больше нет:
-        // - updateEmail()
+        function showStatus(message, type) {
+            const el = document.getElementById('statusMessage');
+            el.textContent = message;
+            el.className = 'status ' + type;
+            setTimeout(() => { el.textContent = ''; el.className = ''; }, 3000);
+        }
+
+        // ❌ УДАЛЕНЫ ВСЕ ФУНКЦИИ:
+        // - changeEmail()
         // - sendEmailVerification()
-        // - подтверждения смены email по ссылке из письма
+        // - updateEmail()
+        // - подтверждение email по ссылке из письма
     </script>
 </body>
 </html>
