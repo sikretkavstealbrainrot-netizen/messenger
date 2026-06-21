@@ -2,120 +2,141 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Чаты</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
     <style>
-        body { font-family: system-ui; background: #f0f2f5; margin: 0; }
-        .sidebar { width: 350px; background: white; height: 100vh; padding: 20px; overflow-y: auto; }
-        .chat-item { padding: 15px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; justify-content: space-between; }
-        .chat-item:hover { background: #f9f9ff; }
-        .new-chat-btn { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 20px; margin-bottom: 20px; cursor: pointer; }
-        .profile-btn { position: fixed; bottom: 20px; left: 20px; background: #333; color: white; border: none; padding: 10px 15px; border-radius: 20px; cursor: pointer; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+        h2 {
+            color: #1a1a2e;
+            margin-bottom: 10px;
+        }
+        .user-greeting {
+            color: #667eea;
+            font-size: 18px;
+            margin: 20px 0;
+        }
+        .btn {
+            display: inline-block;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            margin: 8px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102,126,234,0.4);
+        }
+        .btn-secondary {
+            background: #e8ecf1;
+            color: #333;
+        }
+        .btn-secondary:hover {
+            background: #d5d9e0;
+        }
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        .features {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fc;
+            border-radius: 12px;
+            text-align: left;
+        }
+        .features li {
+            list-style: none;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+            color: #555;
+        }
+        .features li:last-child {
+            border-bottom: none;
+        }
+        .features li::before {
+            content: "✅ ";
+        }
     </style>
 </head>
 <body>
-<div style="display: flex;">
-    <div class="sidebar">
-        <button class="new-chat-btn" id="newGroupBtn">➕ Создать группу</button>
-        <button class="new-chat-btn" id="newChannelBtn">📢 Создать канал</button>
-        <div id="chatsList">Загрузка...</div>
-        <button class="profile-btn" id="profileBtn">👤 Профиль</button>
-        <button class="profile-btn" id="contactsBtn" style="bottom: 80px;">📒 Контакты</button>
+    <div class="container">
+        <h2>💬 Добро пожаловать!</h2>
+        <div class="user-greeting" id="greeting">Загрузка...</div>
+        
+        <div class="features">
+            <li>Вы вошли в мессенджер</li>
+            <li>Безопасный код защищает ваш аккаунт</li>
+            <li>Настройки доступны в профиле</li>
+        </div>
+        
+        <div>
+            <button class="btn btn-primary" onclick="location.href='profile.html'">⚙️ Настройки</button>
+            <button class="btn btn-danger" onclick="logout()">🚪 Выйти</button>
+        </div>
     </div>
-    <div style="flex:1; display: flex; align-items: center; justify-content: center; color: gray;">
-        Выберите чат
-    </div>
-</div>
-<script type="module">
-    import { auth, db, ref, onValue, set, push, get, update } from './firebase-config.js';
 
-    let currentUser = null;
-    auth.onAuthStateChanged(async (user) => {
-        if (!user || !user.emailVerified) {
-            window.location.href = 'index.html';
-            return;
-        }
-        currentUser = user;
-        loadChats();
-    });
+    <script>
+        const db = firebase.firestore();
 
-    async function loadChats() {
-        // Загружаем чаты, где участником является currentUser.uid
-        const chatsRef = ref(db, 'chats');
-        onValue(chatsRef, (snapshot) => {
-            const allChats = snapshot.val() || {};
-            const myChats = [];
-            for (let chatId in allChats) {
-                const chat = allChats[chatId];
-                if (chat.members && chat.members[currentUser.uid]) {
-                    myChats.push({ id: chatId, ...chat });
-                }
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                db.collection('users').doc(user.uid).get()
+                    .then((doc) => {
+                        if (doc.exists) {
+                            const data = doc.data();
+                            document.getElementById('greeting').textContent = 'Привет, ' + (data.username || 'Пользователь') + '!';
+                        } else {
+                            document.getElementById('greeting').textContent = 'Привет!';
+                        }
+                    });
+            } else {
+                window.location.href = 'index.html';
             }
-            renderChats(myChats);
         });
-    }
 
-    function renderChats(chats) {
-        const container = document.getElementById('chatsList');
-        if (chats.length === 0) {
-            container.innerHTML = 'Нет чатов. Создайте группу или добавьте контакты.';
-            return;
+        function logout() {
+            firebase.auth().signOut()
+                .then(() => {
+                    window.location.href = 'index.html';
+                })
+                .catch((error) => {
+                    alert('Ошибка выхода: ' + error.message);
+                });
         }
-        container.innerHTML = chats.map(chat => `
-            <div class="chat-item" onclick="openChat('${chat.id}')">
-                <div><strong>${chat.name || (chat.type === 'private' ? 'Личный чат' : 'Без названия')}</strong><br>
-                <small>${chat.type === 'group' ? 'Группа' : chat.type === 'channel' ? 'Канал' : 'Личные'}</small></div>
-                <div>👉</div>
-            </div>
-        `).join('');
-    }
-
-    window.openChat = (chatId) => {
-        localStorage.setItem('currentChatId', chatId);
-        window.location.href = 'chat.html';
-    };
-
-    document.getElementById('newGroupBtn').onclick = async () => {
-        const groupName = prompt('Название группы');
-        if (!groupName) return;
-        // Простой диалог: добавить участников из контактов
-        const contactsSnap = await get(ref(db, `users/${currentUser.uid}/contacts`));
-        const contacts = contactsSnap.val() || {};
-        const contactUids = Object.keys(contacts);
-        if (contactUids.length === 0) {
-            alert('Нет контактов для добавления в группу');
-            return;
-        }
-        const members = { [currentUser.uid]: true };
-        for (let uid of contactUids) {
-            if (confirm(`Добавить ${uid} в группу?`)) members[uid] = true;
-        }
-        const newChatRef = push(ref(db, 'chats'));
-        await set(newChatRef, {
-            type: 'group',
-            name: groupName,
-            createdBy: currentUser.uid,
-            members: members,
-            messages: {}
-        });
-        alert('Группа создана');
-    };
-
-    document.getElementById('newChannelBtn').onclick = async () => {
-        const channelName = prompt('Название канала');
-        if (!channelName) return;
-        const newChatRef = push(ref(db, 'chats'));
-        await set(newChatRef, {
-            type: 'channel',
-            name: channelName,
-            createdBy: currentUser.uid,
-            members: { [currentUser.uid]: true }, // только создатель, другие будут подписываться
-            messages: {}
-        });
-        alert('Канал создан. Другие пользователи смогут подписаться через поиск.');
-    };
-
-    document.getElementById('profileBtn').onclick = () => window.location.href = 'profile.html';
-    document.getElementById('contactsBtn').onclick = () => window.location.href = 'contacts.html';
-</script>
+    </script>
 </body>
 </html>
