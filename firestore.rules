@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+    function isMe(uid) { return isSignedIn() && request.auth.uid == uid; }
+
+    // Профили пользователей — читать может любой залогиненный (нужно для поиска
+    // контактов и отображения имён/аватаров), редактировать — только себя.
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow create: if isMe(uid);
+      allow update: if isMe(uid);
+      allow delete: if false;
+    }
+
+    // Резервирование юзернеймов
+    match /usernames/{name} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    // Чаты — доступ только участникам
+    match /chats/{chatId} {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.members;
+      allow create: if isSignedIn() && request.auth.uid in request.resource.data.members;
+      allow update: if isSignedIn() && request.auth.uid in resource.data.members;
+      allow delete: if isSignedIn() && request.auth.uid in resource.data.members;
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.members;
+        allow create: if isSignedIn()
+                      && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.members
+                      && request.resource.data.senderId == request.auth.uid;
+        // Разрешаем автору редактировать/удалять свои сообщения,
+        // и любому участнику — только помечать их прочитанными (readBy).
+        allow update: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.members
+                      && (
+                        resource.data.senderId == request.auth.uid ||
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy'])
+                      );
+        allow delete: if false;
+      }
+
+      match /typing/{uid} {
+        allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.members;
+        allow write: if isMe(uid);
+      }
+    }
+  }
+}
