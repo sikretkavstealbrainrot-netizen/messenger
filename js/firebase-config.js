@@ -9,4 +9,4 @@ export const firebaseConfig = {
   storageBucket: "aurora-messenge.firebasestorage.app",
   messagingSenderId: "239989409925",
   appId: "1:239989409925:web:e76b923d55358fe54c41ec
-    };
+  };
